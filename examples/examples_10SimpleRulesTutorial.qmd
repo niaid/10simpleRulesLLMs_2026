@@ -1,9 +1,35 @@
 ---
 title: "Ten Simple Rules for Data Cleaning: A Tutorial with R and Tidyverse"
-format: html
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-depth: 3
+    toc-location: left
 ---
-```{r}
+
+
+# Overview
+
+This script will go through the stages of loading and tidying 3 different data tables with variable kinds of data errors or biases that require noticing, sanity checking, and correcting or reorganizing. At the end, the participants table, variants table, and annotations table will be joined together and the dataset as a whole will be characterized and small analyses conducted.
+
+The intention of this example walk through is:
+
+1.  To demonstrate some common data complexities, how to spot them, and how to fix them
+2.  To illustrate some useful data visualization tools
+3.  To demonstrate some common functions for manipulating data in a computational environment
+
+# 1. Load in the messy data files provided in the repository.
+
+## 1.1 Set up enviroment by loading the libraries (code packages) we need to run the scripts below
+
+If you need to install these, you can do so with the install.packages() function, for example install.packages("tidyverse") to install the tidyverse package. You only need to do this once per computer, but you do need to load the library with library() each time you start a new R session and want to use the functions from that package.
+
+Some packages require other installation instructions to get them from github or bioconductor rather than the standard CRAN repository. A google or LLM conversation should get you sorted with copy-paste instructions.
+```{r, warning=FALSE, message=FALSE}
+#Environment set up, these libraries will be used to execute code
 library(tidyverse)
+library(DT)
 library(janitor)
 library(lubridate)
 library(patchwork)
@@ -16,89 +42,149 @@ conflicted::conflict_prefer("select", "dplyr")
 conflicted::conflict_prefer("filter", "dplyr")
 ```
 
-# Load in the messy data files provided in the repository.
-
 If you have downloaded the files to your computer, update the path below to point to the correct storage location.
 
-# Participants Table
+## 1.2 Load all three tables into the R environment:
+
 ```{r}
-# Read the participant data table into your R environemnt. Note that thetable is a tab-delimited .txt file and not comma-delimited .csv and it must be read with read_tsv() to parse correctly as one of the columns and several of the data values contain commas that create incorrect parsing.
 raw_participants <- read_tsv("messy_participants.txt", show_col_types = TRUE)
-raw_participants_as_csv <- read_csv("messy_participants.txt", show_col_types = TRUE)
+raw_variants <- read_tsv("messy_variants.txt", show_col_types = TRUE)
+raw_annotations <- read_csv("messy_annotations.csv", show_col_types = TRUE)
+```
 
-View(raw_participants)
-View(raw_participants_as_csv)
+Tables can be viewed in the R or Positron environment by using the function View(df) or DT::datatable(df) which allows for interactive sorting and searching. If you are working in Positron, you can also take advantage of the file viewer sidebar to get a quick summary.
 
-#If you are working in Positron, you can also use the sidebar of the file viewer to get some of this information
+# 2. Participants Table
+
+Begin with the Participants Table which contains meta-data, clinical data, and measurements for each of ten participants.
+
+## 2.1 Viewing tables and getting familiar with the data
+
+Two useful ways to start looking at the data are with either DT::datatable() or skim().
+
+```{r}
+# DT::datatable() allows you to interactively sort, filter, and search the table.
+DT::datatable(raw_participants, 
+      filter = "top", 
+      options = list(pageLength = 5), 
+      rownames = FALSE)
+```
+
+The skim() function gives you a nice summary of the data types, missingness, and distributions of values in each column.
+
+```{r}
 skim(raw_participants)
 ```
 
-Note several things we will want to notice and fix with this table.
-1. The column names contain some special characters and units that will make them difficult to work with in R. We will want to clean these up.
-2. The Leukocyte count column is being read as a string (characters) rather than numeric because the value 7.1 x10^9/L and the text word "missing" are not numbers. Values in this column should be coerced to numeric and "missing" represented as NA.
-3. Similarly, blood pressure, height, weight, and date columns are being read as strings due to the presence of units and mixed formatting.
-4. The date column is inconsistently formatted and needs to be standardized if we want to use it as a date in any visualizations or analyses.
-5. There is a missing value for participant P04's age. If we review the "Notes" column, we can see that the investigator meant to fill that in from other sources but has not done so. This value should be added to the data sheet if it is available, or can be left as NA for truly missing. Do not fill a missing value with a placeholder like "unknown", "missing", or a dummy value.
-6. There are values in Leukocyte count ("missing" and "999") that *should be* represented as NA so that the code and downstream analysis recognizes these as missing values.
+### 2.1.1 Delimiters and table structure
+
+As an aside, the raw_participants table has been correctly read in as a tab-delimited .txt file and not comma-delimited .csv. If we had mistakenly read it in as a csv, the comma in the column name `Sex, M/F` would have incorrectly been used as a delimiter. We will not use this version, but see the mess below
 
 ```{r}
-# Lets begin by tidying the column names which will make future code easier to write and read. We will use the convenient janitor::clean_names() function to do this. This will convert all column names to lowercase, replace spaces and special characters with underscores, and remove units from the column names. This way we can refer to the columns with simple names like "age_years" instead of "Age (years)" which would require backticks in R code.
+raw_participants_as_csv <- read_csv("messy_participants.txt", show_col_types = TRUE)
+head(raw_participants_as_csv)
+```
+
+## 2.2 Spotting and fixing data issues
+
+Returning to the raw_participants table, we will want to notice and fix several issues.
+
+1.  The column names contain some special characters and units that will make them difficult to work with in R. We will want to clean these up.
+2.  The Leukocyte count column is being read as a string (characters) rather than numeric because the value 7.1 x10\^9/L and the text word "missing" are not numbers. Values in this column should be coerced to numeric and "missing" represented as NA.
+3.  Similarly, blood pressure, height, weight, and date columns are being read as strings due to the presence of units and mixed formatting. You can not perform mathematical operations on these columns in their current state
+4.  The date column is inconsistently formatted and needs to be standardized if we want to use it as a date in any visualizations or analyses.
+5.  There is a missing value for participant P04's age.
+
+-   If we review the free text "Notes" column, we can see that the investigator meant to fill that in from other sources but has not done so. This value should be added to the data sheet if it is available, or can be left as NA for truly missing.
+-   Do not fill a missing value with a placeholder like "unknown", "missing", or a dummy value.
+
+6.  There are values in Leukocyte count ("missing" and "999") that *should be* represented as NA so that the code and downstream analysis recognizes these as missing values.
+
+## 2.3 Begin cleaning
+
+### 2.3.1 Changing column names
+
+Lets begin by tidying the column names which will make future code easier to write and read. We will use the convenient janitor::clean_names() function to do this. This converts all column names to lowercase, replace spaces and special characters with underscores, and remove units from the column names.
+
+```{r}
 participants <- raw_participants %>% 
   clean_names()
 ```
 
-For those new to R, renaming the object from `raw_participants` to `participants` is creating a new object in the R environment that contains the same data but with cleaned column names. This is a common practice in data cleaning workflows to keep the original raw data separate and unmodified, while creating new objects as we process to analysis-ready versions. This way, if we make a mistake in the cleaning process, we can always go back to the original raw data that we'd loaded. Note as well that an R object will not overwrite the actual raw .csv or .txt file on your computer -- these objects only exist in your R environment. The raw files on your computer will remain unchanged unless/until you explicitly write over them with a function like `write_csv()`.
+For those new to R, renaming the object from `raw_participants` to `participants` is creating a new object in the R environment that contains the same data but with cleaned column names.
 
-## Look at the participants data:
+This is a common practice in data cleaning workflows to keep the original raw data separate and unmodified, while creating new objects as we process to analysis-ready versions. If we make a mistake in the cleaning process and drop or overwrite some values we want to recover we can always go back to the original raw data that we'd loaded.
 
-### Age at enrollment
-Lets plot a histogram to see distribution of ages. Note that P04 is missing age data and will be excluded from this plot with a warning. But everything else looks as expected.
+**Important:** Columns, values, or any other edits done to an R object will not overwrite the actual raw `.csv` or `.txt` file on your computer -- these objects only exist in your R environment. The raw files on your computer will remain unchanged unless/until you explicitly write over them with a function like `write_csv()` or `write_excel()`.
+
+### 2.3.2 Age at enrollment
+
+Start by plotting a histogram to see distribution of ages. Note that P04 is missing age data and will be excluded from this plot with a warning. But everything else looks as expected.
+
 ```{r}
-# Lets plot a histogram to see distribution of ages. Note that P04 is missing age data and will be excluded from this plot with a warning.
 ggplot(participants, aes(x = age_years)) +
   geom_histogram(binwidth = 10, fill = "steelblue", color = "white") +
   labs(title = "Age distribution of participants",
        x = "Age (years)", y = "Count") +
   theme_minimal()
+```
 
-# Note that if we do a math function on this data without telling the code to ignore NA values we can get an NA result for the calculation. This is intended to warn you - the user - that there are undefined values in that column and prevent a *silent* failure that could be misleading by requiring you to intentionally choose that you are OK to ignore missing.
+### 2.3.3 Doing math with missing values
+
+If we do a math function on without telling the code to ignore NA values we can get an NA result for the calculation.
+
+This is intended to warn you - the user - that there are undefined values in that column and prevent a *silent* failure that could be misleading by requiring you to intentionally choose that you are OK to ignore missing.
+
+```{r}
 median(participants$age_years)
+```
 
-#Adding the na.rm=TRUE argument tells the code you are comfortable ignoring the NA values, and the median should be calculated only on the available data.
+Adding the na.rm=TRUE argument tells the code you are comfortable ignoring the NA values, and the median should be calculated only on the available data.
+
+```{r}
 median(participants$age_years, na.rm = TRUE)
 ```
 
-### Sex
-Distribution by sex, using a bar chart
+### 2.3.4 Sex and value standarization
+
+Plot sex distribution using a bar chart scaled to fit the percentage of participants in each category up to 100%.
+
 ```{r}
 participants %>%
   ggplot(aes(x = "Participants", fill = sex_m_f)) +
   geom_bar(position = "fill", width = 0.6, color = "white") +
   scale_y_continuous(labels = label_percent()) +
   labs(
-    title = "Participant Sex Distribution (100% Stacked)",
+    title = "Participant Sex Distribution, raw)",
     x = NULL,
     y = "Percent",
     fill = "Sex"
   ) +
   theme_minimal()
+```
 
-# This reinforces that the code sees each different text string as a different category, despite the distinction between "M", "Male", and "MALE" being entirely meaningless and obviously identical to a human reader. We will want to standardize these values to a consistent text format.
-# There are many ways this can be done, but here we'll use some stringr functions to recode the values by recognizing common patterns and dismissing all variations on case to lowercase. Because we have no interest in preserving the original text values, we will simply overwrite the column based on this formula. If we want to review the original values, we can look back at the raw_participants object which is unchanged.
+This reinforces that the code sees each different text string as a different category, despite the distinction between "M", "Male", and "MALE" being entirely meaningless and obviously identical to a human reader. We will want to standardize these values to a consistent text format.
+
+There are many ways this can be done, but here we'll use some stringr functions to recode the values by recognizing common patterns and setting all text to lowercase. Because we have no interest in preserving the original text values, we will overwrite the original column based on this formula. If we want to review the original values, we can look back at the raw_participants object which is unchanged.
+
+```{r}
 participants <- participants %>%
   mutate(sex_m_f = case_when(
     str_to_lower(sex_m_f) %in% c("f", "female") ~ "Female",
     str_to_lower(sex_m_f) %in% c("m", "male")   ~ "Male",
     TRUE ~ NA_character_
   ))
+```
 
-#Much better
+Plotting again, the data looks much better
+
+```{r}
 participants %>%
   ggplot(aes(x = "Participants", fill = sex_m_f)) +
   geom_bar(position = "fill", width = 0.6, color = "white") +
   scale_y_continuous(labels = label_percent()) +
   labs(
-    title = "Participant Sex Distribution (100% Stacked)",
+    title = "Participant Sex Distribution, cleaned",
     x = NULL,
     y = "Percent",
     fill = "Sex"
@@ -106,16 +192,19 @@ participants %>%
   theme_minimal()
 ```
 
+### 2.3.5 Phenotypes and separating compound information into distinct variables
 
-### Phenotypes
+The phenotypes column is very complex. A few things to note when you look at it:
 
-This column is very complex. A few things to note when you look at it:
-1. There is more than one thing described, as inforamtion about the affected status (healthy volunteer versus clinically described participants) are blended into the same column. If we want to treat healthy volunteers differently from affected participants, we will want to separate those concepts into two columns.
-2. There are multiple phenotypes listed in some cells, but they are delimited inconsistently with semicolons, pipes, and commas. If we simply want to use these as descriptive, we may be ok to leave those as they are. But if we want the code to recognize this as a list of multiple values rather than a single value of (phenotype1; phenotype2; phenotype3), we will want to split these into multiple rows or conver the column to a list columns.
-3. There may be a particular phenotype of interest that we want to use as a variable in the analysis. This conceptual variable may be an umbrella term that covers more than one of the more detailed terms attributed to the participant. For example, if we want to compare participants with infections to those without, or count participants with documented evidence for intellectual disability.
+1.  There is more than one thing described. Information about the affected status (healthy volunteer versus clinically described participants) and the clinical information itself are blended into the same column.
+
+2.  There may be a specific phenotype of interest that we want to use as a variable in the analysis. This new conceptual variable may be an umbrella term that covers more than one of the more detailed terms attributed to the participant. For example, if we want to compare participants with infections to those without, or count participants with documented evidence for intellectual disability.
+
+3.  There are multiple phenotypes listed in some cells, but they are delimited inconsistently with semicolons, pipes, and commas. If we simply want to use these as descriptive, we may be ok to leave those as they are. But if we want the code to recognize this as a list of multiple separate values rather than a single value of "phenotype1; phenotype2; phenotype3", we will want to split these into multiple rows or convert the column to a list columns.
+
+Create a new column "affected" that is derived from the phenotype column. In the formula below, if the phenotype contains the word "healthy", then Affected == "Healthy". If the phenotype contains any other value, then affected status is "Affected".
 
 ```{r}
-# Create a new column "affected" that is derived from the phenotype column. If the phenotype contains the word "healthy", then Affected == "Healthy". If the phenotype contains any other value, then affected status is "Affected". 
 participants <- participants %>%
   mutate(affected = if_else(
     str_to_lower(phenotype) == "healthy volunteer", "Healthy", "Affected"
@@ -129,110 +218,145 @@ participants <- participants %>%
   ))
 ```
 
-Now, we are interested in creating a variable (column) that flags any participants who have intellectual disability. We will use our biomedical understanding to choose terms that we know are associated with this trait, and str_detect() which can look for partial matches, meaning we don't need to split the phenotypes before running this code.
+Next, we are interested in creating a variable (column) that flags any participants who have intellectual disability.
+
+We will use our biomedical understanding to choose terms that we know are associated with this trait, and str_detect() which can look for partial matches, meaning we don't need to split the phenotypes before running this code.
+
 ```{r}
 participants <- participants %>%
   mutate(intellectual_disability = case_when(
     str_detect(str_to_lower(phenotype), "intellectual disability|developmental delay|intell|cognitive") ~ TRUE,
     .default = FALSE))
+```
 
-# Count how many participants have intellectual disability according to this flag.
+Count how many participants have intellectual disability according to this flag.
+
+```{r}
 participants %>%
   group_by(intellectual_disability) %>%
   summarize(n=n_distinct(participant_id))
-
 ```
 
-### Leukocyte Count
+### 2.3.6 Leukocyte Count, treating numbers as numbers, and standardizing missing values
 
-We need to convert this to numeric and represent the missing/dummy values as NA. 
+We need to remove non-numeric scale characters from P02. We can also see that missing values are represented as both "missing" and "999" which need to be standardized to NA so that the code recognizes these properly as missing
+
 ```{r}
 participants <- participants %>%
   mutate(leukocyte_count = str_remove(leukocyte_count, "\\s*x10\\^9/L"),
          leukocyte_count = na_if(leukocyte_count, "missing"),
          leukocyte_count = na_if(leukocyte_count, "999"),
          leukocyte_count = as.numeric(leukocyte_count))
+```
 
-#Distribution across the cohort
+Look at the data as a distribution of leukocyte counts across the cohort
+
+```{r}
 ggplot(participants, aes(x = leukocyte_count)) +
   geom_histogram() +
   labs(title = "Leukocyte count distribution",
        x = "Leukocytes", y = "#Participants") +
   theme_minimal()
+```
 
-#Value for each particpant, graphically. We can see that largely values lie within the normal range with two missing participants and a severe outlier in P04 that is actually expected for this individual.
+Look at the data as a value for each particpant. We can see that values largely lie within the normal range with two missing participants and a severe outlier in P04. Reviewing, this expected for this individual.
+
+```{r}
 ggplot(participants, aes(x = participant_id, y = leukocyte_count)) +
   geom_point() +
   labs(title = "Leukocyte count by participant",
        x = "Participant ID", y = "Leukocytes") +
   theme_minimal()
-
 ```
 
-### Blood Pressure
+### 2.3.7 Blood Pressure and splitting based on a delimiter
 
-Blood pressure here is being read as a string because of the "\" character that is splitting the systolic and diastolic values. We will want to split this into two separate columns for systolic and diastolic blood pressure and convert those to numeric. 
+Blood pressure here is being read as a string because of the `/` character that is splitting the systolic and diastolic values. We will want to split this into two separate columns for systolic and diastolic blood pressure and convert those to numeric.
+
 ```{r}
 participants <- participants %>%
-  separate(
-    blood_pressure_mm_hg,
-    into = c("bp_systolic", "bp_diastolic"),
-    sep = "\\s*\\/\\s*"
+  separate_wider_delim(
+    cols = blood_pressure_mm_hg,
+    delim = "/",
+    names = c("bp_systolic", "bp_diastolic")
   )
 ```
 
+The N/A value in P08 actually splits as well, into "N" and "A". We want to get rid of this.
 
-Note that representing P08 as N/A actually splits the value as well, but into "N" and "A", and keeps the columns as character. We want to get rid of this. Coercing to convert the column to numeric blanks out these values and gives us a user warning that it has introduced NAs with this conversion. In this case - exactly what we wanted to happen so we move on. But if you did not expect any non-numeric values in the column, this warning should make you look back at the data and make sure you have not introduced errors or dropped data.
+Coercing to convert column to numeric will blank out these values and gives us a user warning that it has introduced NAs with this conversion. This is a risky move you always want to review as you can drop values unintentionally. However, in this case - dropping the text "missing" to NA is exactly what we wanted.
+
+If you did not expect any non-numeric values in the column, this warning should make you look back at the data and make sure you have not introduced errors or dropped data.
+
 ```{r}
 participants <- participants %>%
   mutate(bp_systolic = as.numeric(bp_systolic),
          bp_diastolic = as.numeric(bp_diastolic))
 ```
 
-### Height
+### 2.3.8 Height and checking outliers
+
+As in previous examples, we want to remove the units from this cell and have these recognized as numbers
+
 ```{r}
-#As in previous examples, we want to remove the units from this cell and have these recognized as numbers
 participants <- participants %>%
   mutate(height_cm = as.numeric(str_remove(height, "\\s*cm"))) %>%
   select(-height)
 ```
 
+Plot and look at the distribution. We see a clear outlier and want to review that for plausibility (sanity check).
+
 ```{r}
-# Plot the distribution. Here, we see a clear outlier and we want to review that for plausibility.
 participants %>%
   ggplot(aes(x = height_cm)) +
   geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
   labs(title = "Height distribution of participants",
        x = "Height (cm)", y = "Count") +
   theme_minimal()
+```
 
-# Find out who has a height less than 100cm. Here, we see that individual P03 is the outlier, and is also 3years old, thus the short stature is plausible.
+We can use the table to find out who has a height less than 100cm. Here, we see that individual P03 who is only 3years old is our outlier, and that height is not suspicious for a child. Thus the short stature is plausible, and will be retained.
+
+With only 10 participants, we could have just looked at the table, but filtering functioons allow this type of question to scale effectively.
+
+```{r}
 participants %>%
   filter(height_cm < 100) %>%
   dplyr::select(participant_id, age_years, height_cm)
 ```
 
-### Weight
+### 2.3.9 Weight and correcting a single value
 
-There are several data entry errors embedded in this column. 
+There are several data entry errors embedded in this column.
+
+Lets try to evaluate the range first, before cleaning. What we actually see is an alphabetic/alphanumeric sorting where starts with 1 is the minimum and starts with 9 is the maximum. This is not what we'd wanted to see.
+
 ```{r}
-# Lets try to evaluate the range first. What we actually see is an alphabetic/alphanumeric sorting where starts with 1 is the minimum and starts with 9 is the maximum. This is not what we'd wanted to see.
 min(participants$weight)
 max(participants$weight)
+```
 
-# This time, let's split the units from the numeric values first rather than just dropping them as we'd done before. We'll send all numbers to the value "weight_num" and all letters to the column "unit" to take a look. 
+Processing the data more, let's split the units from the numeric values first rather than just dropping them as we'd done before. We'll send all numbers to the value "weight_num" and all letters to the column "unit" and take a look.
+
+```{r}
 participants <- participants %>%
   mutate(
     weight_num = parse_number(weight),
     unit = str_extract(weight, "[[:alpha:]]+") %>% str_to_lower()
   )
+```
 
-# Here, we see two clear things that need addressing. First, we have mixed units (lb and kg) that need to be reviewed and standardized. Second, we have a clear outlier with weight of 2kg which needs to be investigated as a possible data entry error.
+Two clear things need addressing. First, we have mixed units (lb and kg) that need to be reviewed and standardized. Second, we have a clear outlier with weight of 2kg which needs to be investigated as a possible data entry error.
+
+```{r}
 participants %>%
   dplyr::select(weight, weight_num, unit) %>%
   arrange(desc(weight_num))
+```
 
-# After we review notes and are confident that the "lbs" value is truly recorded in pounds and needs conversion (vs a typo when writing units into the table), we can mathematically do that here.
+After we review source notes and are confident that the "lbs" value is truly recorded in pounds and needs conversion (vs a typo when writing units into the table), we can mathematically do that here.
+
+```{r}
 participants<-participants %>%
   mutate(weight_kg = case_when(
     unit == "lbs" ~ weight_num / 2.205,
@@ -247,8 +371,11 @@ participants %>%
 # Now drop the other columns to avoid future confusion, keeping only the weight in kg as a cleaned variable for future analysis.
 participants <- participants %>%
   select(-weight, -weight_num, -unit)
+```
 
-# Plot the distribution of weight in kg.
+Plot the distribution of weight in kg.
+
+```{r}
 participants %>%
   ggplot(aes(x = weight_kg)) +
   geom_histogram(binwidth = 10, fill = "steelblue", color = "white") +
@@ -257,17 +384,22 @@ participants %>%
   theme_minimal()
 ```
 
+The participant with recorded weight of 2kg is is clearly a data entry error, even for a 3yr old.
+
+If possible, we will want to return to any original source notes to see if the value can be corrected to a true value, but barring that, we will want to blank it out as missing rather than allowing the error to enter our analysis. In this example, the true value is found in notes as 24kg. This can be corrected on the original data sheet, but we'll demonstrate how to do it here as well.
 
 ```{r}
-# The participant with recorded weight of 2kg is is clearly a data entry error, even for a 3yr old. If possible, we will want to return to any original source notes to see if the value can be corrected to a true value, but barring that, we will want to blank it out as missing, rather than allowing the error to enter our analysis. In this example, the true value is found in notes as 24kg. This can be corrected on the original data sheet, but we'll demonstrate how to do it here as well.
-
 # For any weight value less than 5kg, replace with 24kg. We could also be exact and use for weight_kg == 2 then 24.
 participants <- participants %>%
   mutate(weight_kg = case_when(
     weight_kg < 5 ~ 24, # based on review of notes
     .default = weight_kg
   ))
+```
 
+Plot the corrected distribution
+
+```{r}
 participants %>%
   ggplot(aes(x = weight_kg)) +
   geom_histogram(bins = 10, fill = "steelblue", color = "white") +
@@ -277,14 +409,16 @@ participants %>%
   theme_minimal()
 ```
 
-### Dates
+### 2.3.10 Dates
 
 The recorded dates appear to be entered pretty freely and inconsistently. We even have a date that appears to have been auto-converted to an Excel serial number.
+
 ```{r}
 unique(participants$date_of_enrollment)
 ```
 
-LLMs can create a variety of custom scripts capable of parsing dates, relying on the janitor::convert_to_date or lubridate::parse_date_time functions which are designed to recognize dates specifically and standardize their representations. 
+LLMs can create a variety of custom scripts capable of parsing dates, relying on the janitor::convert_to_date or lubridate::parse_date_time functions which are designed to recognize dates specifically and standardize their representations.
+
 ```{r}
 # This is a complex custom function, but if you're working with an LLM code assistant - you don't need to write it, you just need to review the input and output as matching, and make sure the LLM is accurately parsing all the variety properly. While you can overwrite the column, here we'll create a second column (date_of_enrollment_std) that allows manual comparison with the input.
 participants <- participants %>%
@@ -312,35 +446,45 @@ participants <- participants %>%
       }
     )
   )
+```
 
+Check that the function has accurately standardized the dates.
+
+```{r}
 participants %>%
   select(participant_id, date_of_enrollment, date_of_enrollment_std)
 ```
 
-### Reorganize your table to bring columns you want to see together, together
+### 2.3.11 Reorganize your table
+
+To improve human readability and scanability, reorder some columns. A relocate() function could also be used here.
+
 ```{r}
 participants <- participants %>%
   select(participant_id, affected, date_of_enrollment_std, age_years, sex_m_f, height_cm, weight_kg, everything())
 ```
 
-### Admire your work
+### 2.3.12 Admire your work
 
 Notice which columns are now properly represented as numeric or dates, check the missing fraction as expected, see minimums, maximums, completion rate summaries, etc. You're ready to go.
+
 ```{r}
 skim(participants)
 ```
 
-# Variants Table
+# 3. Variants Table
 
-Read in the data about which participants carry which variants, and some annotation information about them
+Look at the variants table using skim()
+
 ```{r}
-raw_variants <- read_tsv("messy_variants.txt", show_col_types = TRUE)
-
-skim(raw_variants)
-View(raw_variants)
+head(raw_variants)
 ```
 
 Plenty of data cleanup required here too. As we walked through it before, we'll combine several steps in our first pass.
+
+## 3.1 Genomic coordinates and non-ambiguous data
+
+This longer script chains together a series of operations similar to what was done stepwise above. The goal is to have genomic coordinates as both an ID (chr-pos-ref-alt), and as manipulable values.
 
 ```{r}
 variants<-raw_variants %>%
@@ -375,18 +519,38 @@ variants<-raw_variants %>%
   mutate(hgvsp = na_if(str_trim(hgvsp), "."))
 ```
 
+Visualize the variant data with a bar graph that counts variants/chromosome and colors by variant type.
+
 ```{r}
-# Let's find any values that are blank for hgvsp
+ggplot(variants, aes(x = chrom, fill = variant_type)) +
+  geom_bar(position = "stack") +
+  labs(title = "Variant distribution by chromosome and type",
+       x = "Chromosome", y = "Count of Variants", fill = "Variant Type") +
+  theme_minimal() + 
+  coord_flip()
+```
+
+After running the function above, we want to evaluate its completeness by printing all the rows where hgvsp or chr is blank/missing. Had we left "." behind, we would have to remember to include that in our filter as well, as a "." is not a missing value to a computer.
+
+```{r}
 variants %>%
-  filter(is.na(hgvsp)) %>%
+  filter(is.na(hgvsp) | is.na(chrom))  %>%
   dplyr::select(gene_zygosity, variant_type, hgvsc, hgvsp, chrom, pos)
 ```
 
-Above, we could see that there are three variant rows where no hgvsp is provided. Two of these are expected as the variant lands in an non-coding region and thus does not have a protein coding change. The third reveals a more complex situation. This participant has an extra copy of chromosome 21 which is definitely information we want; however the gene and variant information about that is not being well-represented in the table. We need to make a decision about how we want to capture it.
+Above, we could see that there are three variant rows returned.
 
-Decision: add variant type as "chromosome_duplication", leave hgvsc and hgvsp blank, and document the chrom, pos, ref, and alt in a custom fashion with "N" (for normal) and "SV" (for copy number 3) ref/alt configuration. These particular choices are entirely arbitrary for this purpose and do not reflect best practices in genomics for representation of copy number variants. 
+Two of these are expected as the variant lands in an non-coding region and thus does not have a protein coding change (hgvsp). The third reveals a more complex situation as this participant has an extra copy of chromosome 21 (information we want); however the gene and variant information about that is not being well-represented in the table. We need to make a decision about how we want to capture it.
 
-Our goal in doing this is so that if/when we want to count the number of unique variants by looking at unique values in the chrom-pos-ref-alt columns, this variant will actually be counted as a variant and not left uncounted as an NA/missing or counted as a non-distinct/duplicate value if more than one NA is present in the table.
+## 3.2 Manually changing table data
+
+Sometimes, you may need/want to fill missing data into your working table or change the representation of data that's present your table in a targeted way based on the way you want to work with the data in the moment. You do not *have* to always return to Excel, etc to re-type.
+
+**Decision:** for the trisomy21 variant, enter variant type as "chromosome_duplication", leave hgvsc and hgvsp blank, and document the chrom, pos, ref, and alt in a custom fashion with "N" (for normal) and "CN3" (for copy number 3) as ref/alt configuration.
+
+-   These particular choices are entirely arbitrary for this purpose and do not reflect best practices in genomics for representation of copy number variants.
+
+Representing these bits of information more comprehensively allows the trisomy 21 variant to be counted or plotted as non-blank when we work with these columns.
 
 ```{r}
 # Participants with at least one variant in the table. 
@@ -394,8 +558,11 @@ Our goal in doing this is so that if/when we want to count the number of unique 
 variants %>%
   group_by(participant) %>%
   summarize(n_variants = sum(!is.na(genomic_position)))
+```
 
-# Fill in the custom information we decided above for documenting trisomy into this table. This is writing the missing information into our R object.
+Fill in the custom information we decided above for documenting trisomy into this table using case_when() to modify the intended value *when* some other value in the row is true.
+
+```{r}
 variants<-variants %>%
   mutate(
     variant_type = case_when(
@@ -411,7 +578,7 @@ variants<-variants %>%
       TRUE ~ ref
     ),
     alt = case_when(
-      str_detect(gene_zygosity, "trisomy 21") ~ "SV",
+      str_detect(gene_zygosity, "trisomy 21") ~ "CN3",
       TRUE ~ alt
     ),
     genomic_position = case_when(
@@ -419,17 +586,21 @@ variants<-variants %>%
       TRUE ~ genomic_position
     )
   )
+```
 
-# We can now see that participant P07 has two distinct, non-NA variants accounted for. Just what we wanted.
+We can now see that participant P07 has two distinct, non-NA variants accounted for. Just what we wanted.
+
+```{r}
 variants %>%
   group_by(participant) %>%
   summarize(n_variants = sum(!is.na(genomic_position)))
 ```
 
-### The gene and zygosity information is blended in one column. After taking a look at the table, we see we need to do a few operations here. 
+## 3.3 Gene and zygosity column and extracting mixed information from complex columns
+
+The gene and zygosity information is blended in one column and the way it is recorded doesn't have an easy delimiter value to split by. After taking a look at the table, we see we need to do a few operations here to separate those concepts into their own columns and standardize the value representations.
 
 ```{r}
-# First, we want to separate 
 variants <- variants %>%
 
 # Strip off leading and trailing whitespace
@@ -439,10 +610,12 @@ variants <- variants %>%
 # Since we noticed the unnecessary dash in MECP2 (not part of the formal gene name per HGNC nomenclature), let's remove that too. This script replaces every "-" with nothing instead "". More complex functions would be possible but are not necessary in this dataset
     gene_zygosity = str_replace_all(gene_zygosity, regex("-", ignore_case = TRUE), ""),
 
-# We will try to extract gene names from their current representation by taking the leading alphanumeric characters before the first space or parenthesis, and converting to uppercase for standardization. Zygosity will be captured by detecting strings that match hemi, hom, or het patterns, ignoring case. Because we bring the knowledge that germline PTEN as a secondary finding must be heterozyous, we'll match that into the pattern, though it is best practice to review the raw data.
+# We will try to extract gene names from their current representation by taking the leading alphanumeric characters before the first space or parenthesis, and converting to uppercase for standardization. 
    gene = gene_zygosity %>%
       str_extract("^[A-Za-z0-9]+") %>%
       str_to_upper(),
+
+#Zygosity will be captured by detecting strings that match hemi, hom, or het patterns, ignoring case. Because we bring the external knowledge that germline PTEN as a secondary finding must be heterozyous, we'll match that into the pattern, though it is best practice to review the raw data.
     zygosity = case_when(
       str_detect(gene_zygosity, "hem") ~ "Hemizygous",
       str_detect(gene_zygosity, "hom") ~ "Homozygous",
@@ -450,14 +623,18 @@ variants <- variants %>%
       .default = NA_character_
       )
     )
+```
 
-# See how we did? Looks pretty good though there remains some missing data - it was missing in the input
+See how we did?
+
+```{r}
 variants %>%
   select(gene_zygosity, gene, zygosity) %>%
   arrange(gene)
 ```
 
-We know that the information on gene zygosity must exist for all the variants, and it is missing simply because it was not recorded. So this calls for returning to source documents to fill in the missing information. We will assume source documentation reveals that the two short variants with missing zygosity are actually heterozygous.
+Since we know that the information on gene zygosity must exist for all the variants, missing simply because it was not recorded. So this calls for returning to source documents to fill in the missing information accurately. We will assume source documentation reveals that the two short variants with missing zygosity are actually heterozygous.
+
 ```{r}
 variants <- variants %>%
   mutate(zygosity = case_when(
@@ -470,23 +647,34 @@ variants %>%
   select(gene_zygosity, gene, zygosity) %>%
   arrange(gene)
 
-# Drop the gene_zygosity column now that we have extracted the information we wanted from it into separate columns.
+# Drop the blended gene_zygosity column now that we have extracted the information we wanted from it into separate columns. It can be retained, but it will not be used again
 variants <- variants %>%
   select(-gene_zygosity)
 ```
 
-## Now we look at the data to get familiar with it
+## 3.4 Now we look at the data to get familiar with it
+
+How many unique variants do we have?
+
 ```{r}
-# How many unique variants do we have?
 n_distinct(variants$genomic_position)
+```
 
-# How many participants are on this table with a variant described?
+How many participants are in this table with at least one variant described?
+
+```{r}
 n_distinct(variants$participant)
+```
 
-# What types of variants are present in this table?
+What types of variants are present in this table?
+
+```{r}
 count(variants, variant_type)
+```
 
-# Which genes are present with annotated variants, and what kinds? Who carries them?
+Which genes are present with annotated variants, and what kinds? Who carries them?
+
+```{r}
 variants %>%
   group_by(gene) %>%
   summarize(
@@ -498,22 +686,26 @@ variants %>%
   arrange(desc(nParticipants))
 ```
 
-# Annotations Table.
+# 4. Annotations Table.
 
-Load in the annotations table from file
+Quick look at the annotations table from file
+
 ```{r}
-raw_annotations <- read_csv("messy_annotations.csv", show_col_types = TRUE)
-
 skim(raw_annotations)
-View(raw_annotations)
+head(raw_annotations)
 ```
 
 Looking at the data we see:
-1. A funny looking character "\n17-40554783-T-C" that is a hidden newline. This will create problems for parsing, joining and printing the table, and it's not part of the intended value. We want to get rid of it.
-2. The gene HBB has a parenthetical (HbS) next to it as this is the variant responsible for sickle cell trait/disease and that nomenclature may be very familiar to a researcher. However, if we want to join material based on gene name, "HBB" and "HBB (HbS)" will not be recognized as the same gene.
-3. The allele frequency needs to be coerced to numeric if we want to use frequency-based filtering for the minor allele frequency. Also we want to ensure that a value of NA (which we have confirmed as "variant not seen in gnomAD") is treated as a true zero frequency showing that it is ultrarare, rather than a variant with no information. 
-4. Variant prediction scores from SpliceAI, AlphaMissense, and REVEL also need to be converted to numeric. For SpliceAI and REVEL, there are multiple values separated by "&" that represent scores for different isoforms. We decide to take the maximum across those isoforms to get a single value for each variant.
 
+1.  A funny looking character "\n17-40554783-T-C" that is a hidden newline. This will create problems for parsing, joining and printing the table, and it's not part of the intended value. We want to get rid of it.
+2.  The gene HBB has a parenthetical (HbS) next to it as this is the variant responsible for sickle cell trait/disease and that nomenclature may be very familiar to a researcher. However, if we want to join material based on gene name, "HBB" and "HBB (HbS)" will not be recognized as the same gene.
+3.  The allele frequency needs to be coerced to numeric if we want to use frequency-based filtering for the minor allele frequency.
+    -   Also we want to ensure that a value of NA (which we have confirmed as "variant not seen in gnomAD") is treated as a true zero frequency showing or ultrarare, rather than a variant with no information.
+4.  Variant prediction scores from SpliceAI, AlphaMissense, and REVEL also need to be converted to numeric. For SpliceAI and REVEL, there are multiple values separated by "&" that represent scores for different isoforms. We decide to take the maximum across those isoforms to get a single value for each variant.
+
+## 4.1 Standard data tidying and getting rid of the characters you don't see
+
+Excel and copy-pasting data are notorious for bringing in "hidden" characters that may seem invisible to a human. Because editing away special characters requires certain syntax, you may need the help of regex (regular expressions) which are interpreted by code as synonyms for things like tabs, newlines, carriage returns, and spaces that don't separate words, etc.
 
 ```{r}
 # Clean column names and remove all hidden characters from the table
@@ -523,38 +715,72 @@ annotations <- raw_annotations %>%
     across(
       where(is.character),
       \(x) x %>%
-        str_replace_all("\u00A0", " ") %>%                     # non-breaking spaces
-        str_replace_all("[\u200B-\u200D\uFEFF]", "") %>%       # zero-width chars
-        str_replace_all("[[:cntrl:]]+", " ") %>%               # tabs/newlines/control chars
-        str_squish()                                           # trim + collapse internal whitespace
+        str_replace_all("\u00A0", " ") %>%             # non-breaking spaces
+        str_replace_all("[\u200B-\u200D\uFEFF]", "") %>% # zero-width chars
+        str_replace_all("[[:cntrl:]]+", " ") %>%       # control chars
+        str_squish()
     )
   )
+```
 
-# Separate the gene column again using the first space, keeping only the gene name and discarding everything after
+Using the regex function was able to preserve spaces that separate words, while removing spaces that come before a value (leading spaces), after a value (trailing spaces), while getting rid of any other hidden or whitespace characters.
+
+To get rid of the (HbS) value, we could use multiple strategies, here - find the first space, keep everything before it (the gene name), and throw away everything afterwards, whatever it is.
+
+```{r}
 annotations <- annotations %>%
   separate_wider_delim(cols = gene, delim = " ", names = c("gene", NA), too_few = "align_start")
 ```
 
-### Move onto allele frequency
+## 4.2 Be rigorous with allele frequency and accurate representation of missing *as* zero.
+
+When a variant is *absent* from an external resource like gnomAD, we often can biologically interpret that as being less frequent than 1/total_participants (assuming high quality coverage and mapping in the region). This is different from blank/missing because we have no information and the MAF is 'unknown', however the latter is how an NA will be interpreted in code.
+
+A mathematical filter to keep variants with MAF\<0.01 will keep variants with MAF=0 but drop variants with MAF=NA, even if these are among the most interesting for a rare variant research question.
+
 ```{r}
-#Look for any NA/empty values
+# Using the filter without addressing NA as zero
+annotations %>%
+  filter(af_gnom_ad < 0.01) %>%
+  summarize(n=n_distinct(genomic_position_chr_pos_ref_alt))
+
+# Using the filter to treat NA as zero
+annotations %>%
+  filter(af_gnom_ad < 0.01 | is.na(af_gnom_ad)) %>%
+  summarize(n=n_distinct(genomic_position_chr_pos_ref_alt))
+```
+
+Look for any NA/empty values in the allele frequency column. Make sure treating them as zero is valid based on the source data.
+
+```{r}
 annotations %>%
   filter(is.na(af_gnom_ad)) %>%
   select(gene, af_gnom_ad)
+```
 
-# Creating a new intermediate data frame, we update input NA to zero and coerce to numeric. 
+Creating a new intermediate data frame for illustration purposes, we update input NA to zero and coerce to numeric without overwriting our working annotations table.
+
+```{r}
 a<-annotations %>%
   mutate(af_gnom_ad = case_when(
     is.na(af_gnom_ad) ~ 0,
     TRUE ~ as.numeric(af_gnom_ad)
   ))
+```
 
-# However, we can see that coercing to numeric has turned the value `4.968e-6 into an new NA as the leading tick mark made it recognized as a string/text value (a warning was printed). Other small numbers that are merely in scientific notation are properly recongized as numeric. This is not acceptable. If we were to leave this in and apply a frequency filter to retain or flag any variants that are below (or above) a certain frequency, this variant would be dropped from the analysis entirely due to the NA value (indeterminate frequency). This can create silent errors.
+However, we can see that coercing to numeric has turned the value \`4.968e-6 into an new NA as the leading tick mark made it recognized as a string/text value (a warning was printed).
+
+This is also not acceptable for our purposes as we have lost true information about the allele frequency.
+
+```{r}
 a %>%
   filter(is.na(af_gnom_ad)) %>%
   select(gene, af_gnom_ad)
+```
 
-# Instruct the code to remove the leading tick mark prior to converting values to numeric.
+Instead, instruct the code to remove the leading tick mark prior to converting values to numeric.
+
+```{r}
 annotations<-annotations %>%
   mutate(af_gnom_ad = case_when(
     is.na(af_gnom_ad) ~ 0,
@@ -567,8 +793,9 @@ annotations %>%
   select(gene, af_gnom_ad)
 ```
 
+Plot distribution of allele frequencies. We can see that two variants have MAF of 0 (absent from gnomAD), most variants are ultrarare with in gnomAD, and a few have low but non-zero frequencies. One variant stands out as common with a MAF exceeding 50%. Depending on our goals, this variant may need to be reviewed.
+
 ```{r}
-# Plot distribution of allele frequencies. We can see that two variants have MAF of 0 (absent from gnomAD), most variants are ultrarare with in gnomAD, and a few have low but non-zero frequencies. One variant stands out as common with a MAF exceeding 50%. Depending on our goals, this variant may need to be reviewed.
 ggplot(annotations, aes(x = af_gnom_ad)) +
   geom_histogram(binwidth = 0.001, fill = "steelblue", color = "steelblue") +
   labs(title = "Allele frequency distribution in gnomAD",
@@ -583,14 +810,30 @@ annotations %>%
   select(gene, genomic_position_chr_pos_ref_alt, clinvar, af_gnom_ad)
 ```
 
-### Clinvar
-```{r}
-# Review values in the clinvar column
-unique(annotations$clinvar)
+## 4.3 Clinvar and looking at unique values from a categorical/text column.
 
-# Lets consolidate into a simplified set of categories. It may be beneficial to review the evidence on ClinVar before accepting an assertion, and/or to understand what may be meant by "conflicting interpretations of pathogenicity".
-# In order to avoid having the code recognize "Conflicting interpretations of <b>pathogenic</b>ity" as "Pathogenic" due to the presence of the word "pathogenic", we will use case_when() which is an ordered function. This checks for the condition "Conflicting" before "Pathogenic" to ensure only one simplified value is retained for each variant. 
-# Because capitalization varies, we will ensure str_detect() ignores case
+Periodically, a cell will include multiple values that we want to simplify with a logical operation. For example, the ClinVar column in this table includes multiple assertions that are concatenated together without being meaningfully different for analysis purposes.
+
+```{r}
+# Look at your data and review unique values in the clinvar column
+unique(annotations$clinvar)
+```
+
+If there is a value that stands out, we might want to look where it is in the table so we can investigate and handle it properly
+
+```{r}
+annotations %>%
+  filter(str_detect(clinvar, "Conflicting")) %>%
+  select(gene, genomic_position_chr_pos_ref_alt, clinvar)
+```
+
+We can consolidate some of these into simplified categories tomake our lives easier and our visualizations more clear.
+
+It may be beneficial to review the evidence on ClinVar before accepting an assertion, and/or to understand what may be meant by "conflicting interpretations of pathogenicity" before performing this step.
+
+Because we will use stringr functions and we want to avoid having the code recognize "Conflicting interpretations of <b>pathogenic</b>ity" as \~= "Pathogenic", we will use the ordered function case_when(). This checks for the condition "Conflicting" before "Pathogenic" to ensure only one simplified value is retained for each variant. We also want to ignore variable capitalization.
+
+```{r}
 annotations <- annotations %>%
   mutate(clinvar_simple = case_when(
     str_detect(clinvar, regex("Conflicting", ignore_case = TRUE)) ~ "Conflicting",
@@ -605,14 +848,17 @@ annotations %>%
   summarize(n = n_distinct(genomic_position_chr_pos_ref_alt))
 ```
 
-### Bioinformatics predictions
+## 4.4 Bioinformatics predictions, reviewing distributions and checking missingness when missingness is not random
 
-There are several nuances to the values in the bioinformatics predictions. Certain variant types are not scored by certain algorithms and thus have NA values that are expected and appropriate. For example, AlphaMissense and REVEL only provides scores for missense variants. We want to be sure to recognize these as appropriately missing based on the variant type, rather than as errors or as zero values.
+There are several nuances to the values in the bioinformatics predictions. Certain variant types are not scored by certain algorithms and thus have NA values that are expected and appropriate. For example, AlphaMissense and REVEL only provides scores for missense variants. We want to be sure to recognize these as appropriately missing based on the variant type, rather than as errors or as zero values. We do not want to set dummy or placeholder values.
 
 We can also notice that there are a few rows where isoform-specific scores are provided with an "&" delimiter. We will take the maximum score across isoforms to get a single value for each variant, but other approaches could be taken depending on the goals of the analysis.
 
+### 4.4.1 Look at the data before you touch it
+
+We can see below that the SpliceAI scores are mostly near zero with a few higher. Meanwhile, the AlphaMissense and REVEL scores span the 0-1 range. With only a few variants, we can't actually determine if these are bimodal (either near zero or one), uniform (every value equally represented), normally distributed around 0.5 with tails of low and high scores, or something else - but we would want to use that information to select appropriate thresholds for filtering if we were not going to use literature recommendations.
+
 ```{r}
-# Look at the distribution of SpliceAI scores. We can see that most variants have a score of zero, but a few have higher scores that may be of interest. We also see that the maximum score across isoforms is being properly captured for those with multiple isoform scores.
 # First, we'll look just at what happens if we plot the raw values that are coercible to numeric without additional parsing. 
 ggplot(annotations %>% mutate(splice_ai = as.numeric(splice_ai)), aes(x = splice_ai)) +
   geom_histogram(binwidth = 0.1, fill = "steelblue", color = "steelblue") +
@@ -633,8 +879,13 @@ ggplot(annotations %>% mutate(revel = as.numeric(revel)), aes(x = revel)) +
   labs(title = "REVEL score distribution",
        x = "REVEL Score", y = "Count") +
   theme_minimal()
+```
 
-# We might reasonably expect that AlphaMissense and REVEL scores may be correlated. Let's take a look. Our dataset is a bit too small to do this well, but a correlation does appear to be there.
+If you have expectations of these data, check it.
+
+We might reasonably expect that AlphaMissense and REVEL scores (both missense variant predictors) should be correlated. Let's take a look. Our dataset is a bit too small to do this well, but a correlation does appear to be present.
+
+```{r}
 ggplot(annotations %>% mutate(alpha_missense_score = as.numeric(alpha_missense_score), revel = as.numeric(revel)), aes(x = alpha_missense_score, y = revel)) +
   geom_point() +
   labs(title = "AlphaMissense vs REVEL scores",
@@ -642,11 +893,12 @@ ggplot(annotations %>% mutate(alpha_missense_score = as.numeric(alpha_missense_s
   theme_minimal()
 ```
 
-### Fix and preprocess the scores
+### 4.4.2 Evaluate dropouts and preprocess the scores
 
-Ensure that all values present are numeric and missing values are encoded with NA.
+In the script and figures above we had warnings about missing values or non-finite values in the dataset. This suggests some of the scores are incomplete or have a non-blank value that is still not being recognized as a plot-able numeric value.
 
 When doing complex parsing like this, it may be preferable to create a new object rather than overwriting the existing object. This allows you to make more mistakes and compare the actual outcome with your intention.
+
 ```{r}
 annotations_processed <- annotations %>%
   mutate(
@@ -669,13 +921,140 @@ annotations_processed <- annotations_processed %>%
   mutate(revel = if_else(is.infinite(revel), NA_real_, revel))
 ```
 
-# Bring data together
+Re-plot the cleaned up scores to see the difference, and review the more reliable result.
 
-Combining data tables is a common and very straightforward process when you are working computationally. 
+### 4.4.3 Look at the clean, analysis-ready data
+
+```{r}
+# Replot the same distributions as above, post-processed
+ggplot(annotations_processed %>% mutate(splice_ai = as.numeric(splice_ai)), aes(x = splice_ai)) +
+  geom_histogram(binwidth = 0.1, fill = "steelblue", color = "steelblue") +
+  labs(title = "SpliceAI score distribution",
+       x = "Max SpliceAI Score", y = "Count") +
+  theme_minimal()
+
+# Do the same for AlphaMissense scores. 
+ggplot(annotations_processed %>% mutate(alpha_missense_score = as.numeric(alpha_missense_score)), aes(x = alpha_missense_score)) +
+  geom_histogram(binwidth = 0.1, fill = "steelblue", color = "steelblue") +
+  labs(title = "AlphaMissense score distribution",
+       x = "AlphaMissense Score", y = "Count") +
+  theme_minimal()
+
+# Repeat for REVEL scores
+ggplot(annotations_processed %>% mutate(revel = as.numeric(revel)), aes(x = revel)) +
+  geom_histogram(binwidth = 0.1, fill = "steelblue", color = "steelblue") +
+  labs(title = "REVEL score distribution",
+       x = "REVEL Score", y = "Count") +
+  theme_minimal()
+```
+
+With tidyier data, we can also check additional hypotheses, like whether pathogenic variants have higher (or lower) average scores.
+
+```{r}
+# This requires pivoting the data to long format so all three scores share one x-axis. Each row becomes one score observation for one variant.
+
+annotation_scores_long <- annotations_processed %>%
+  mutate(
+    clinvar_group = case_when(
+      clinvar_simple == "PLP" ~ "PLP",
+      TRUE ~ "Other"
+    ),
+    clinvar_group = factor(clinvar_group, levels = c("PLP", "Other"))
+  ) %>%
+  select(clinvar_group, splice_ai, alpha_missense_score, revel) |>
+  pivot_longer(
+    cols      = c(splice_ai, alpha_missense_score, revel),
+    names_to  = "algorithm",
+    values_to = "score"
+  )
+```
+
+Data table conversion between wide and long is common and much easier to do computationally than manually.
+
+Review the data arrangement in the long format
+```{r}
+head(annotation_scores_long)
+```
+
+We know some scores are missing in the dataset. We want to count and represent these explicitly in our plot.
+```{r}
+# Computed missingness per score x group for caption annotation. This automatically updates text to be used in the figure caption.
+annotation_missing_summary <- annotation_scores_long %>%
+  group_by(algorithm, clinvar_group) |>
+  summarise(
+    n_total   = n(),
+    n_missing = sum(is.na(score)),
+    .groups   = "drop"
+  ) %>%
+  mutate(label = paste0(algorithm, " / ", clinvar_group,
+                        ": ", n_missing, " missing of ", n_total))
+
+caption_text <- paste(
+  "Missing values excluded from boxes and points (not imputed).",
+  paste(annotation_missing_summary$label, collapse = "\n"),
+  sep = "\n"
+)
+```
+
+Now we prepare the plot.
+
+```{r}
+ggplot(annotation_scores_long,
+  aes(x = algorithm, y = score, fill = clinvar_group)) +
+     geom_boxplot(
+      alpha         = 0.5,
+      position      = position_dodge(width = 0.75),
+      width         = 0.55,
+      na.rm         = TRUE
+  ) +
+    geom_point(
+      aes(color = clinvar_group),
+      position = position_jitterdodge(
+      jitter.width = 0.15,
+      dodge.width  = 0.75
+    ),
+    size  = 2.5,
+    alpha = 0.8,
+    na.rm = TRUE
+  ) +
+  scale_fill_manual(
+    values = c("PLP" = "steelblue", "Other" = "coral"),
+    name   = "ClinVar group"
+  ) +
+  scale_color_manual(
+    values = c("PLP" = "steelblue", "Other" = "coral"),
+    name   = "ClinVar group"
+  ) +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2)) +
+
+  labs(
+    title    = "Pathogenicity scores by ClinVar classification",
+    subtitle = "PLP = Pathogenic / Likely Pathogenic; Other = all remaining or missing ClinVar values",
+    x        = NULL,
+    y        = "Score (0\u20131)",
+    caption  = caption_text
+  ) +
+
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position  = "top",
+    plot.caption     = element_text(size = 7, color = "grey40",
+                                    hjust = 0, lineheight = 1.4),
+    plot.caption.position = "plot",
+    panel.grid.major.x    = element_blank()
+  )
+```
+
+# 5. Bring data together
+
+Combining data tables is a common and very straightforward process when you are working computationally.
 
 If two tables have a common ID variable, you can use that directly. If the two tables have a variable representing a common ID but with different column names, or slightly different formatting, you can do some quick parsing to get those into alignment and then join.
 
-## Join annotations to variants
+## 5.1 Join annotations to variants
+
+Review the input data for basics before joining
+
 ```{r}
 # How many unique variants in the variants table?
 n_distinct(variants$genomic_position)
@@ -692,7 +1071,7 @@ variants %>%
   inner_join(annotations_processed, by = c("genomic_position" = "genomic_position_chr_pos_ref_alt")) %>%
   nrow()
 
-# We can see that this error is due to differently representing the same variant across the two tables. In the variants table we have the chr prefix and in the annotations table we do not. We can fix this with a quick parsing step to add the "chr" prefix to the chrom column in the annotations table so they should match up.
+# We can see that this error is due to differently representing the same variant across the two tables: with or without a "chr" prefix.We can simply paste the "chr" prefix to the chrom column in the annotations table so they should match up.
 annotations_processed <- annotations_processed %>%
   mutate(genomic_position = paste0("chr", genomic_position_chr_pos_ref_alt))
 
@@ -722,6 +1101,11 @@ ggvenn(table_variants_list,
 ```
 
 We can see that there is one mysterious variant in the annotations table that is not in the variants table.
+
+### 5.1.1 Table-to-table
+
+Even without joining, we can use and compare data across tables easily.
+
 ```{r}
 #Find the variant in the annotations table that is not in the variants table
 annotations_processed %>%
@@ -732,37 +1116,56 @@ annotations_processed %>%
 variants %>%
   filter(!genomic_position %in% annotations_processed$genomic_position) %>%
   select(participant, gene, genomic_position)
-
 ```
 
 The trisomy 21 doesn't have a detailed variants match on the variants table, as the data present is only for short variants. So we will not be matching those with a table join, and this is expected. The SHANK3 variant (annotation table only) is simply not present in the variants table. This would be a moment to look back at notes, but may simply be that it was not observed in the set of participants that were considered for this analysis and that's how we'll treat it.
 
-Bring all three tables together with full joins. Because we've carefully cleaned each table in advance, this process will go smoothly based on genomic position for variant information and participant ID for participant information. If we had not 
+Bring all three tables together with table joins. Because we've carefully cleaned each table in advance, this process will go smoothly based on genomic position for variant information and participant ID for participant information.
+
+Left join the variants and annotation tables. We are only interested in bringing in annotations for the variants that were observed in our patients. This will exclude the SHANK3 variant that did not overlap.
+
 ```{r}
-# Left join the variants and annotation tables. We are only interested in bringing in annotations for the variants that were observed in our patients. This will exclude the SHANK3 variant that did not overlap
 variants_annotations <- variants %>%
   left_join(annotations_processed, by = c("genomic_position" = "genomic_position", "gene" = "gene"))
 
 skim(variants_annotations)
+```
 
-# Full join the variants_annotations table with the participants table.
+Take a look at the joined table result summary. Pay special attention to any unexpectedly missing data that suggests only a fraction (rather than whole) of the variants were annotated. With a left join, we expect all variants in the variants table to remain, but unjoined annotations will be dropped.
+
+A full join keeps all rows from both tables, even if the join key doesn't find a match.
+
+```{r}
+# Full join the variants_annotations table with the participants table. A full join keeps all rows from 
 variants_annotations_participants <- variants_annotations %>%
   full_join(participants, by = c("participant" = "participant_id"))
 
 skim(variants_annotations_participants)
 ```
 
-## Analysis
+We can see that P05 has no variant described in the other table. Ensure that this is expected rather than data dropped in the processing.
 
-Describe the cohort
+If we want to base yield on the entire cohort, we need to keep this participant in the denominator. If we are looking to work only with the subset of participants who have variants, we could instead have used a semi-join, or can drop the participant after joining.
+
+# 6. Analysis
+
+## 6.1 QC and describe the cohort
+
+How many participants present?
+
 ```{r}
-# How many participants present?
 n_distinct(variants_annotations_participants$participant)
+```
 
-# How many participants have at least one variant described?
+How many participants have at least one variant described?
+
+```{r}
 n_distinct(variants_annotations_participants$participant[!is.na(variants_annotations_participants$genomic_position)])
+```
 
-# How many genes, and how many variants/gene
+How many genes, and how many variants/gene?
+
+```{r}
 variants_annotations_participants %>%
   group_by(gene) %>%
   summarize(
@@ -773,7 +1176,23 @@ variants_annotations_participants %>%
   arrange(desc(nParticipants))
 ```
 
-# Filter to variants that are putatively functional
+By participant, how many variants do they have and in which genes?
+
+```{r}
+variants_annotations_participants %>%
+  group_by(participant) %>%
+  summarize(
+    nVariants=n_distinct(genomic_position),
+    genes = paste(gene, collapse = ", "),
+    zygosity = paste(zygosity, collapse = ", ")
+  ) %>%
+  arrange(desc(nVariants))
+```
+
+## 6.2 Apply filters and functions to the analysis-ready dataset
+
+Use filters to prioritize variants as putatively functional based on annotations.
+
 ```{r}
 variants_annotations_participants<-variants_annotations_participants %>%
   mutate(
@@ -785,13 +1204,19 @@ variants_annotations_participants<-variants_annotations_participants %>%
       TRUE ~ FALSE
     )
   )
+```
 
-# Number of participants with at least one putatively functional variant
+Number of participants with at least one putatively functional variant
+
+```{r}
 variants_annotations_participants %>%
   group_by(putatively_functional) %>%
   summarize(n = n_distinct(participant))
+```
 
-# Predicted functional and not prioritized variants per participant
+Predicted functional and not prioritized variants per participant
+
+```{r}
 variants_annotations_participants %>%
   group_by(participant) %>%
   summarize(
@@ -801,8 +1226,13 @@ variants_annotations_participants %>%
   arrange(desc(n_putatively_functional), desc(n_not_prioritized))
 ```
 
+## 6.3 Test hypotheses
+
+We should not expect statistical significance with this small example dataset, but we can still apply the appropriate tests to get a sense of how to do this in a larger dataset and to practice interpreting the results. If helpful, provide both big picture and granular descriptions of the data and any nuance in it to an LLM to help select appropriate analytic designs and statistical methods. Describe the variables you want to incorporate and how, and what data type you have as the outcome (eg. numeric with some kind of distribution, categorical, etc).
+
+<b>In this cohort, are putatively functional variants more likely to be found in participants with intellectual disability?</b>
+
 ```{r}
-# In this cohort, are putatively functional variants more likely to be found in participants with intellectual disability?
 variants_annotations_participants %>%
   group_by(participant, intellectual_disability) %>%
   summarize(n_putatively_functional = sum(putatively_functional, na.rm = TRUE)) %>%
@@ -810,11 +1240,13 @@ variants_annotations_participants %>%
   summarize(mean_putatively_functional = mean(n_putatively_functional))
 ```
 
-In this cohort, are putatively functional variants more likely to be found in younger participants?
-```{r}
-# Because we know (and can describe) that the probability of a participant carrying a putatively functional variant is categorical (TRUE/FALSE), we want to use a logistic regression or a beta binomial test with age as the predictor.
+<b>In this cohort, are putatively functional variants more likely to be found in younger participants?</b>
 
-# Create a processed data frame for each participant that has a single row/participant and documents their enrollment age as well as TRUE/FALSE for whether they have at least one putatively functional variant present.
+Because we know (and can describe) that the probability of a participant carrying a putatively functional variant is categorical (TRUE/FALSE), we want to use a logistic regression or a beta binomial test with age as the predictor. Beta binomial is appropriate for probabilities or proportions scaled between 0 and 1. Logistic regression is appropriate for categorical outcomes (putatively functional variant present: Y/N).  
+
+Create a processed data frame for each participant that has a single row/participant and documents their enrollment age as well as a categorical TRUE/FALSE for whether they have at least one putatively functional variant present.
+
+```{r}
 age_analysis_df <- variants_annotations_participants %>%
   summarize(
     age_years = dplyr::first(age_years),
@@ -822,8 +1254,11 @@ age_analysis_df <- variants_annotations_participants %>%
     n_functional = sum(putatively_functional %in% TRUE, na.rm = TRUE),
     .by = participant
   )
+```
 
-# Fit a logistic regression with age as the predictor (x) and detection of a putatively functional variant as the outcome (y). We use a binomial family to specify that the outcome is categorical (T/F or 1/0) rather than continuous.
+Then, fit a logistic regression with age as the predictor (x) and detection of a putatively functional variant as the outcome (y). We use a binomial family to specify that the outcome is categorical (T/F or 1/0) rather than continuous.
+
+```{r}
 logit_fit <- glm(
   any_functional ~ age_years,
   data = age_analysis_df,
@@ -833,9 +1268,9 @@ logit_fit <- glm(
 logit_fit
 ```
 
-In fitting the logistic regression, we see that the individual with missing age was necessarily dropped from the analysis as uninformative.
+In fitting the logistic regression, we see that the individual with missing age was necessarily dropped from the analysis as uninformative. This is an example of how missing data can lead to dropouts in analysis and reduce the available sample size. Many dropouts or dropouts that correlate with particularly interesting participants can cause erroneous conclusions.
 
-Prompting the LLM to describe the model output further if you are not familiar with it can be helpful to understand the results and how to interpret them. 
+Prompting the LLM to describe the model output further if you are not familiar with it can be helpful to understand the results and how to interpret them.
 
 In this case, the coefficient for age_years is 0.00339, aka, near zero. This coefficient can be interpreted that with each additional year of age, the log-odds of having at least one putatively functional variant goes down by an nearly neglible amount. We can make this more interpretable, we can make this more interpretable by exponentiating the coefficients to get odds ratios, though this is simply making the same information in a more familiar way.
 
