@@ -1,0 +1,17 @@
+Participant	Gene_Zygosity	Genomic_Position (chr-pos-ref-alt)	HGVS (HGVSc/HGVSp)	Variant_Type	Phenotype_Association
+P01	ARID1B (het)	chr6-157174117-G-A	c.3345G>A / p.Lys1115=	synonymous	Coffin-Siris syndrome 1
+P01	ARID1B (het)	chr6-157206564-G-A	c.5792G>A / p.Arg1931His	missense	Coffin-Siris syndrome 1
+P01	G6PD (hom)	chrX-154532247-G-A	c.1398C>T / p.Thr466Thr	synonymous	"Anemia, nonspherocytic hemolytic, due to G6PD deficiency"
+P01	SCN1A (het)	chr2-166053034-C-T	c.603-91G>A	intron	"Early-infantile DEE, carbamazepine response - Dosage"
+P02	CCR7_het	chr17-40554783-T-C	c.1096A>G / p.Met366Val	Missense	not specified
+P03	SCN1A (het)	chr2-166043878-G-A	c.5566G>A / p.Gly1856Arg	stop_gain	Early-infantile DEE
+P03	PTEN secondary finding	chr10-87864539-G-C	c.388C>T / p.Arg130*	missense	Hereditary cancer-predisposing syndrome
+P04	CTLA4 (het)	chr2-203870699-C-T	c.1379G>A / p.Arg460His	Missense	"Autoimmune lymphoproliferative syndrome due to CTLA4 haploinsufficiency, not provided"
+P04	CFTR (het)	chr7-117530975-G-A	c.350G>A / p.Arg117His	missense	Cystic Fibrosis
+P06	DNAH7 (het	chr2-195872391-C-T	c.6492G>A / p.Met2164Ile	Missense	"Ciliary dyskinesia, primary, 50"
+P06	  DNAH7	chr2-195737943-A-G	c.12053T>C / p.Leu4018Pro	Missense	Primary ciliary dyskinesia
+P07	BRCA1_heterozygous	chr17-43093010-G-A	c.2521C>T / p.Arg841Trp	missense	cancer
+P07	trisomy 21				Down Syndrome
+P08	MYBPC3 (het)	chr11-47332126-T-TGCAGACATAGATGCCCCC	c.3742_3759dup / p.Gly1248_Cys1253dup	Inframe insertion	Hypertrophic cardiomyopathy 4
+P09	HBB (het)	chr11-5227002-T-A	c.20A>T / p.Glu7Val	missense	"not provided, Hb SS disease, Inborn genetic diseases, beta Thalassemia, Heinz body anemia, Hereditary persistence of fetal hemoglobin, Dominant beta-thalassemia, Malaria, susceptibility to, Beta-thalassemia HBB/LCRB, METHEMOGLOBINEMIA, BETA TYPE, Erythrocytosis, familial, 6, alpha Thalassemia, Sickle cell disease and related diseases, See cases, Sickle cell-hemoglobin C disease, HEMOGLOBIN S, Malaria, resistance to, HBB-related disorder"
+P10	MECP-2	chrX-154097709-AGC-A	c.-46_-45de / .	5' UTR	"Autism, Rett Syndrome"

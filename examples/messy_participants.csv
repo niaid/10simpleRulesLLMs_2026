@@ -1,0 +1,11 @@
+Participant ID,Age (years),Sex (M/F),Phenotype,Leukocyte Count,Blood Pressure (mmHg),Height,Weight,Date of Enrollment,Notes
+P01,34,Female,Intellectual disability,6.2,120/80,165cm,68kg,2021-03-14,Consented at clinic visit. No known family history.
+P02,29,M,Epilepsy; Intellectual disability,7.1 x10^9/L,132/88,170cm,82kg,03/21/2021,Follow-up overdue; patient moved and changed GP.
+P03,41,female,Epilepsy,5.9,118/76,160cm,380kg,2021-05-02,Weight recorded at home by patient. Query data entry error.
+P04,NA,Male,Autism|Epilepsy,8.3,122/84,172cm,75kg,2021-05-19,Age not recorded at enrollment. DOB on file - calculate from records.
+P05,52,F,Intellectual disability,999,140/90,155 cm,58kg,2021-06-30,999 entered in error - sample not processed day of collection.
+P06,38,male,Autism,6.8,128/82,180cm,90kg,June 7 2021,Bilingual patient. Interpreter present at consent.
+P07,45,Female,Epilepsy,7.2,130/85,168cm,156.5lbs,2021-07-22,Weight taken at GP surgery and recorded in lbs. Convert before analysis.
+P08,31,FEMALE,Autism; Epilepsy,6.1,N/A,162cm,65kg,2021-08-09,BP cuff unavailable at visit. Repeat measurement outstanding.
+P09,27,Male,Intellectual disability|Autism, 5.8,115/75,175cm,79kg,2021-09-01,Referred from neurology. Previous WES negative - this is reanalysis.
+P10,39,male,Unknown,missing,125/83,170cm,73kg,2021-09-15,Phenotype unclear at enrollment. MDT review pending.

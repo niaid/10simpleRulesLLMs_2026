@@ -1,0 +1,18 @@
+Genomic_Position (chr-pos-ref-alt),Gene,AF_gnomAD,Clinvar,SpliceAI,AlphaMissenseScore,REVEL
+22-51154365-G-T,SHANK3,1.1e-4,Likely pathogenic,0.26&0.33,,0.71
+6-157174117-G-A,ARID1B,,"Pathogenic/Likely pathogenic, Pathogenic, Likely pathogenic,",0.71,,.
+6-157206564-G-A,ARID1B,,Benign,0,0.0817,0.123
+X-154532247-G-A,G6PD,0.0006248,Conflicting classifications of pathogenicity,0,NA,.
+2-166053034-C-T,SCN1A,0.5341,drug response,0.01,NA,.&.
+"
+17-40554783-T-C",CCR7,`4.968e-6,Uncertain significance,0.01,0.0527,0.039
+2-166043878-G-A,SCN1A,6.195E-07,Pathogenic,0,nA,.
+10-87864539-G-C,PTEN,6.196E-07,Pathogenic,0.03,0.999,0.98
+2-203870699-C-T,CTLA4,0.000001239,Pathogenic,0.01,0.2572,0.864
+7-117530975-G-A,CFTR,0.002135,Pathogenic,0.02,0.66,0.807
+2-195872391-C-T,DNAH7,0.0003526,Likely pathogenic,0.21,0.4639,0.106&0.106
+2-195737943-A-G,DNAH7,0.000001859,Uncertain significance,0,0.9886,0.46
+ 17-43093010-G-A,BRCA1,0.002547,Benign,NA,0.0844,0.355
+11-47332126-T-TGCAGACATAGATGCCCCC,MYBPC3,0.000003719,Pathogenic,0.47,.,.
+11-5227002-T-A,HBB (HbS),0.002652,Pathogenic,0.01,0.2229,0.535
+X-154097709-AGC-A,MECP2,0.000002223,Uncertain significance,NA,NA,.
