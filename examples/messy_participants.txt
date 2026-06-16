@@ -1,0 +1,11 @@
+Participant ID	Age (years)	"Sex, M/F"	Phenotype	Leukocyte Count	Blood Pressure (mmHg)	Height	Weight	Date of Enrollment	Notes
+P01	7	Female	Intellectual disability; recurrent infections; delayed speech; microdontia; muscle weakness	6.2	120/80	121cm	68kg	46022.5	Consented at clinic visit. No known family history.
+P02	29	M	Cryptococcus infection|Irritable Bowel Syndrome|COVID-19	7.1 x10^9/L	132/88	170cm	82kg	3/21/21	Follow-up overdue; patient moved and changed GP.
+P03	3	female	Epilepsy	5.9	118/76	88cm	2kg	5/2/21	
+P04	NA	Male	Autoimmune lymphoproliferative syndrome due to CTLA4 haploinsufficiency; decreased total lymphocyte count; decreased circulating immunoglobulin; Eczematoid dermatitis; rash	0.3	122/84	172cm	55kg	5/19/21	DOB on file - calculate from records.
+P05	32	M	Intellectual disability	999	140/90	155 cm	58kg	6/30/21	999 entered in error - sample not processed day of collection.
+P06	38	male	recurrent lower respiratory tract infections; bronchiectasis; situs inversus totalis	6.8	128/82	186cm	90kg	June 7 2021	Spanish speaking patient. Interpreter present at consent.
+P07	45	Female	Obesity|Global developmental delay	7.2	130/85	168cm	141.5lbs	7/22/21	Weight taken at GP surgery and recorded in lbs. Convert before analysis.
+P08	55	MALE	"Heart failure, dyspnea, exertional fatigue"	6.1	N/A	178cm	81kg	8/9/21	"BP cuff unavailable at visit. Repeat measurement outstanding,see notes from cardiology"
+P09	27	Male	healthy volunteer	5.8	115/75	175cm	79kg	9/1/21	
+P10	24	male	Anxiety|Depression|Autism|Attention-deficit Hyperactivity disorder	missing	125/83	170cm	73kg	9/15/21	CMA pending
