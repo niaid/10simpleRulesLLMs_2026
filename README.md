@@ -32,3 +32,7 @@ To run the code and view line-by-line more interactively as well as try out your
 All data in the examples is synthetic/fake.
 
 For questions, please reach out to Joanne Berghout (joanne.berghout@nih.gov)
+
+---
+View recording of live session here
+[Click to view](https://s3.amazonaws.com/proj-bip-prod-publicread/training/10simpleRulesLLMs_2026/BCBB+Webinar+10+Simple+Rules+for+Working+Effectively+with+LLMs+in+Biological+and+Biomedical+Data+Analysis-captioned.mp4)
