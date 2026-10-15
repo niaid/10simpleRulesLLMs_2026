@@ -16,9 +16,9 @@ The 10 Rules are:
 3. Have a validation plan
 4. Look at your data
 5. Plot distributions, pay attention to missing values
-6. Make your dataa rectangular and unambiguous
+6. Make your data rectangular and unambiguous
 7. Don't overwrite your raw data
-8. be accountable for all analysis design choices. Align with literature or be ready to defend differences
+8. Be accountable for all analysis design choices. Align with literature or be ready to defend differences
 9. Sanity check outputs
 10. Archive a reproducible, end-to-end version of your analysis code
 
@@ -30,8 +30,6 @@ For example scripts (with data visualizations, cleaning, and simple operations),
 To run the code and view line-by-line more interactively as well as try out your own edits, download the three example data files (messy_participants, messy_variants, and messy_annotations) along with the .qmd file. The .qmd file is written entirely in R and can be opened in your RStudio environment or in Positron. 
 
 All data in the examples is synthetic/fake.
-
-For questions, please reach out to Joanne Berghout (joanne.berghout@nih.gov)
 
 ---
 View recording of live session here
